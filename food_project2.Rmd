@@ -1,0 +1,183 @@
+---
+title: "Food Nutrition Dimension Reduction"
+author: "Weronika Mądro 473193"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction and project overview
+
+The purpose of the project is to investigate and proceed the dimension reduction on the dataset Food Nutrition  from Kaggle (https://www.kaggle.com/datasets/utsavdey1410/food-nutrition-dataset). This project focuses on analyzing a comprehensive nutritional food database, which provides detailed information on the macro and micronutrient content of various food items. The dataset includes essential nutritional values such as caloric content, fat, carbohydrates, proteins, vitamins, and minerals, which are crucial for understanding dietary needs. With this data, there can be explored the nutritional value of foods and identify patterns in food composition, aiding in healthier dietary planning. 
+
+## Principal Component Analysis (PCA)
+
+Principal Component Analysis is a dimensionality reduction technique that simplifies complex datasets by transforming correlated variables into a smaller set of uncorrelated components. It retains the most important information while reducing redundancy, making it ideal for visualizing and analyzing high-dimensional data. PCA will be used in this project to reduce the dimensionality of the nutritional data, helping to identify the most significant factors that explain the variance in food composition.
+
+## Preprocessing
+
+The first step is to load and investigate the dataset.
+```{r}
+food <- read.csv("FOOD-DATA-GROUP1.csv")
+head(food,1)
+str(food)
+
+food <- food[3:length(food)]
+```
+Caloric values needs a conversion into numeric variables.
+```{r}
+food$Caloric.Value <- as.numeric(gsub("[^0-9.]", "", food$Caloric.Value))
+dim(food)
+```
+Let's check the NAs int the dataset.
+```{r}
+library(dplyr)
+sum(is.na(food))
+```
+The data needs to be scaled.
+
+```{r}
+food <- scale(food[, 2:length(food)])
+```
+Subsequently, the data needs summarizing.
+
+```{r}
+summary(food)
+```
+## Correlation matrix and KMO
+
+The Kaiser-Meyer-Olkin (KMO) measure assesses the adequacy of sample data for factor analysis. It evaluates the proportion of variance in variables that might be caused by underlying factors. A KMO value closer to 1 indicates that the data is suitable for factor analysis, while values below 0.5 suggest that factor analysis may not be appropriate.
+```{r}
+library("psych")
+KMO(food)
+```
+
+As the KMO turns out to be rather low I decided to remove variables with low MSA such as Carbohydrates, Dietary Fiber, Vitamin A and Vitamin C, Vitamin K and Calcium.
+
+```{r}
+food <- as.data.frame(food)
+food <- food %>% select(-Carbohydrates, -Dietary.Fiber, -Vitamin.A, -Vitamin.C, - Vitamin.K, -Calcium)
+```
+Let's check KMO once again.
+```{r}
+KMO(food)
+```
+
+The overall KMO value has increased to 0.81, indicating that the dataset is now more suitable for factor analysis. This represents a notable improvement compared to the previous result, suggesting that the removal of certain variables has enhanced the adequacy of the data.
+
+```{r}
+dim(food)
+```
+The data has 551 observations and 28 variables.
+
+The Bartlett test is a statistical test used to determine whether the variables in a dataset are sufficiently correlated.
+```{r}
+cortest.bartlett(food, n = 15428)
+```
+
+The p-value of Bartlett's test is 0, indicating that our correlation matrix significantly differs from the identity matrix.
+
+The correlation matrix has been investigated, providing deeper insights into the relationships between variables and confirming the suitability of the data for further factor analysis. 
+
+```{r}
+library(corrplot)
+cor <- cor(food)
+corrplot(cor, type = "lower", order = "hclust", tl.col = "black", tl.cex = 0.5)
+```
+
+# Principal Component Analysis
+
+For the the singular value decomposition analysis to compute the principal components prcomp function is used.
+```{r}
+food.pca <- prcomp(food, center = TRUE, scale = TRUE)
+summary(food.pca)
+```
+PC1 has the highest standard deviation and explains approximately 28.92% of the total variance.
+
+There is also another approach - the spectral decomposition approach.
+```{r}
+food.pca2<-princomp(food)
+loadings(food.pca2)
+```
+Loadings represent the contribution of each original variable to the principal components. Each column in the loadings matrix corresponds to a principal component and each row corresponds to an original variable. The higher the absolute value of a loading, the more strongly the original variable contributes to that principal component. 
+
+Next step is to create a scree plot of eigenvalues.
+```{r}
+library("factoextra")
+fviz_eig(food.pca, choice = "eigenvalue", ncp = 22,barfill = "skyblue", barcolor = "darkblue", linecolor = "darkgreen", addlabels = TRUE,main = "Scree Plot of Eigenvalues", xlab = "Principal Components", ylab = "Eigenvalue", line.size = 1.2, bar.width = 0.8, fill.alpha = 0.6)          
+```
+Kaiser's rule is recommended for deciding how many factors to keep in factor analysis. It suggests retaining only those components or factors that have eigenvalues greater than 1.
+
+For this analysis selecting 7 components is suitable as their eigenvalues exceed 1, according to Kaiser's rule.
+
+```{r}
+eig.val<-get_eigenvalue(food.pca)
+eig.val
+```
+The results show that PC7 explains 73.89% of variation.
+
+## Components analysis and  correlation circle
+
+```{r}
+fviz_pca_ind(food.pca, col.ind="cos2", geom = "point", gradient.cols = c("blue", "purple", "red"), title = "PCA - Individual points")
+```
+The graph shows a dense area of points. Let's remember that there are 7 dimensions.
+```{r}
+fviz_pca_var(food.pca, col.var = "blue", labelsize = 3)
+```
+The PCA variable plot indicates that most of the variable labels are clustered in the right half.
+
+Below, there are presented graphs of contribution of different variables for each dimension.
+```{r}
+library(gridExtra)
+var<-get_pca_var(food.pca)
+PC1<-fviz_contrib(food.pca, "var", axes=1, xtickslab.rt=90)
+grid.arrange(PC1,ncol = 1,top='Contribution to Principal Components')
+```
+```{r}
+PC2<-fviz_contrib(food.pca, "var", axes=2, xtickslab.rt=90)
+grid.arrange(PC2,ncol = 1,top='Contribution to Principal Components')
+```
+```{r}
+PC3<-fviz_contrib(food.pca, "var", axes=3, xtickslab.rt=90)
+grid.arrange(PC3,ncol = 1,top='Contribution to Principal Components')
+```
+```{r}
+PC4<-fviz_contrib(food.pca, "var", axes=4, xtickslab.rt=90)
+grid.arrange(PC4,ncol = 1,top='Contribution to Principal Components')
+```
+```{r}
+PC5<-fviz_contrib(food.pca, "var", axes=5, xtickslab.rt=90)
+grid.arrange(PC5,ncol = 1,top='Contribution to Principal Components')
+```
+```{r}
+PC6<-fviz_contrib(food.pca, "var", axes=6, xtickslab.rt=90)
+grid.arrange(PC6,ncol = 1,top='Contribution to Principal Components')
+```
+```{r}
+PC7<-fviz_contrib(food.pca, "var", axes=7, xtickslab.rt=90)
+grid.arrange(PC7,ncol = 1,top='Contribution to Principal Components')
+```
+
+# Hierarchical clustering
+
+Let's present the hierarchical clustering dendogram for the variables.
+
+```{r}
+distance.m<-dist(t(food))
+hc<-hclust(distance.m, method="complete") 
+plot(hc, hang=-1)
+rect.hclust(hc, k = 7, border='#3399FF')
+```
+
+```{r}
+sub_grp<-cutree(hc, k=7) 
+fviz_cluster(list(data = distance.m, cluster = sub_grp), palette=c("blue", "purple","green", "yellow", "red", "brown", "orange" ))
+```
+
+Combining hierarchical clustering dendogram and the cluster plot it can be said that the branches of the tree cover with the clusters.
+
+# Conclusion
+This study aimed to explore the possibility of simplifying the complexity of happiness scores by identifying a smaller set of key variables using PCA for dimensional reduction. The results demonstrated that 7 principal components are sufficient to represent the data. The comparison revealed that both PCA and hierarchical clustering led to similar conclusions, confirming the robustness of the results.
